@@ -72,6 +72,23 @@ agent-runtrace export latest --out failing-run.agenttrace.zip
     diffs/
 ```
 
+## Use cases
+
+`agent-runtrace` is useful when an agent does more than return text:
+
+- debug failed coding-agent runs
+- attach reproducible traces to GitHub issues
+- save CI artifacts for failed agent evals
+- compare prompts or agent policies
+- teach new contributors how an agent works
+- audit risky commands and tool calls
+- inspect browser-agent steps
+- build regression tests for agent behavior
+- demo agent products with evidence
+- analyze latency and token/cost patterns
+
+See [docs/use-cases.md](docs/use-cases.md) for concrete workflows.
+
 ## Why this should exist
 
 Agent teams need repeatable debugging before they need another framework. Raw logs are not enough when an agent can call tools, edit files, retry, and fail halfway through. A trace should be something you can attach to an issue, inspect in CI, or use to reproduce a bad run.
