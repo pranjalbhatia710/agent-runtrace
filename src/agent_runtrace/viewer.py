@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 import json
 from pathlib import Path
 from typing import Any, Dict, List
@@ -29,6 +28,7 @@ def render_html(run_dir: str | Path) -> str:
     metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.exists() else {}
     events = load_events(run_dir)
     payload = json.dumps({"metadata": metadata, "events": events}, ensure_ascii=False)
+    payload = payload.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -72,7 +72,7 @@ pre {{ white-space:pre-wrap; word-break:break-word; background:#070b12; color:#d
   <section id="timeline" class="timeline"></section>
   <section id="detail" class="detail"><div class="empty">Select an event.</div></section>
 </main>
-<script id="payload" type="application/json">{html.escape(payload)}</script>
+<script id="payload" type="application/json">{payload}</script>
 <script>
 const data = JSON.parse(document.getElementById('payload').textContent);
 const events = data.events;
