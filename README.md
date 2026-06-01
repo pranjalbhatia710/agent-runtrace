@@ -87,7 +87,7 @@ agent-runtrace export latest --out failing-run.agenttrace.zip
 - demo agent products with evidence
 - analyze latency and token/cost patterns
 
-See [docs/use-cases.md](docs/use-cases.md) for concrete workflows.
+See [docs/use-cases.md](docs/use-cases.md) for concrete workflows and [docs/field-reports.md](docs/field-reports.md) for real runs across Python and JavaScript repositories.
 
 ## Why this should exist
 
