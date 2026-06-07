@@ -39,13 +39,14 @@ def render_html(run_dir: str | Path) -> str:
 :root {{ color-scheme: dark; --bg:#0b0f19; --panel:#121827; --muted:#8b9bb4; --text:#e8eefc; --line:#26334d; --accent:#7dd3fc; --bad:#fb7185; --ok:#86efac; }}
 * {{ box-sizing: border-box; }}
 body {{ margin:0; background:var(--bg); color:var(--text); font:14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }}
-header {{ padding:24px 28px; border-bottom:1px solid var(--line); background:#0f1624; }}
+header {{ padding:24px 28px; border-bottom:1px solid var(--line); background:#0f1624; position:sticky; top:0; z-index:2; }}
 h1 {{ margin:0 0 8px; font-size:26px; letter-spacing:-.02em; }}
 .sub {{ color:var(--muted); }}
 main {{ display:grid; grid-template-columns: 380px 1fr; min-height:calc(100vh - 98px); }}
 .timeline {{ border-right:1px solid var(--line); padding:18px; overflow:auto; }}
-.event {{ width:100%; text-align:left; border:1px solid var(--line); background:var(--panel); color:var(--text); border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer; }}
-.event:hover, .event.active {{ border-color:var(--accent); }}
+.event {{ width:100%; text-align:left; border:1px solid var(--line); background:var(--panel); color:var(--text); border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer; transition:border-color .15s, transform .15s; }}
+.event:hover, .event:focus-visible, .event.active {{ border-color:var(--accent); outline:none; }}
+.event:hover {{ transform:translateY(-1px); }}
 .row {{ display:flex; align-items:center; justify-content:space-between; gap:8px; }}
 .badge {{ font-size:12px; padding:2px 8px; border-radius:999px; background:#1d2a44; color:var(--accent); }}
 .badge.error {{ color:var(--bad); }}
@@ -60,12 +61,26 @@ pre {{ white-space:pre-wrap; word-break:break-word; background:#070b12; color:#d
 .empty {{ color:var(--muted); padding:28px; }}
 .stats {{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }}
 .stat {{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }}
+.toolbar {{ margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }}
+.search {{ flex:1 1 280px; min-width:0; border:1px solid var(--line); background:#070b12; color:var(--text); border-radius:10px; padding:10px 12px; }}
+.search:focus {{ border-color:var(--accent); outline:none; box-shadow:0 0 0 3px rgba(125,211,252,.12); }}
+.count {{ color:var(--muted); font-size:12px; }}
+@media (max-width: 820px) {{
+  header {{ padding:18px; }}
+  main {{ grid-template-columns:1fr; }}
+  .timeline {{ border-right:0; border-bottom:1px solid var(--line); max-height:42vh; }}
+  .detail {{ padding:18px; }}
+}}
 </style>
 </head>
 <body>
 <header>
   <h1>agent-runtrace</h1>
   <div class="sub">Local trace viewer for AI agent runs</div>
+  <div class="toolbar">
+    <input id="search" class="search" type="search" placeholder="Filter by event name, type, input, output, or error" aria-label="Filter trace events" />
+    <div id="count" class="count"></div>
+  </div>
   <div id="stats" class="stats"></div>
 </header>
 <main>
@@ -79,8 +94,12 @@ const events = data.events;
 const timeline = document.getElementById('timeline');
 const detail = document.getElementById('detail');
 const stats = document.getElementById('stats');
+const search = document.getElementById('search');
+const count = document.getElementById('count');
+let visibleEvents = events;
 function esc(x) {{ return String(x ?? '').replace(/[&<>]/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c])); }}
 function pretty(x) {{ return esc(JSON.stringify(x ?? {{}}, null, 2)); }}
+function haystack(e) {{ return [e.type, e.name, e.started_at, e.error, JSON.stringify(e.input ?? {{}}), JSON.stringify(e.output ?? {{}})].join(' ').toLowerCase(); }}
 function renderStats() {{
   const types = events.reduce((m,e)=>(m[e.type]=(m[e.type]||0)+1,m),{{}});
   const failures = events.filter(e => e.error || (e.output && e.output.exit_code && e.output.exit_code !== 0)).length;
@@ -89,18 +108,19 @@ function renderStats() {{
     `<div class="stat"><b>${{failures}}</b> failures</div>`;
 }}
 function renderTimeline() {{
-  timeline.innerHTML = events.map((e,i)=>`<button class="event" data-idx="${{i}}">
+  count.textContent = `${{visibleEvents.length}} of ${{events.length}} events`;
+  timeline.innerHTML = visibleEvents.length ? visibleEvents.map((e,i)=>`<button class="event" data-idx="${{i}}" aria-label="Open ${{esc(e.name)}} event">
     <div class="row"><span class="badge ${{e.error ? 'error' : 'ok'}}">${{esc(e.type)}}</span><span class="meta">${{e.duration_ms ?? 0}}ms</span></div>
     <div class="name">${{esc(e.name)}}</div>
     <div class="meta">${{esc(e.started_at)}} ${{e.error ? ' · error' : ''}}</div>
-  </button>`).join('');
+  </button>`).join('') : '<div class="empty">No matching events.</div>';
   [...document.querySelectorAll('.event')].forEach(btn => btn.onclick = () => select(Number(btn.dataset.idx)));
-  if (events.length) select(0);
+  if (visibleEvents.length) select(0);
 }}
 function select(i) {{
   document.querySelectorAll('.event').forEach(b => b.classList.remove('active'));
   document.querySelector(`.event[data-idx="${{i}}"]`)?.classList.add('active');
-  const e = events[i];
+  const e = visibleEvents[i];
   detail.innerHTML = `<div class="card">
     <div class="row"><h2>${{esc(e.name)}}</h2><span class="badge">${{esc(e.type)}}</span></div>
     <div class="meta">${{esc(e.started_at)}} → ${{esc(e.ended_at || 'running')}} · ${{e.duration_ms ?? 0}}ms</div>
@@ -109,6 +129,11 @@ function select(i) {{
     <h3>Output</h3><pre>${{pretty(e.output)}}</pre>
   </div>`;
 }}
+search.addEventListener('input', () => {{
+  const q = search.value.trim().toLowerCase();
+  visibleEvents = q ? events.filter(e => haystack(e).includes(q)) : events;
+  renderTimeline();
+}});
 renderStats(); renderTimeline();
 </script>
 </body>
