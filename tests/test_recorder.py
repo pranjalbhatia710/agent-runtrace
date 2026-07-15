@@ -1,8 +1,13 @@
+import json
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 from agent_runtrace import Recorder
+from agent_runtrace.cli import main
 from agent_runtrace.viewer import load_events, write_viewer
+
 
 
 def test_recorder_logs_llm_and_shell(tmp_path):
@@ -58,3 +63,27 @@ def test_redact_patterns_apply_to_nested_event_payloads(tmp_path):
     assert events[0]["input"]["prompt"] == "token [REDACTED]"
     assert events[0]["output"]["response"] == "response [REDACTED]"
     assert "sk-secret" not in raw_trace
+
+
+def test_run_cli_redact_flag_scrubs_shell_output(tmp_path):
+    old_cwd = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        exit_code = main([
+            "run",
+            "--redact",
+            r"sk-[A-Za-z0-9]+",
+            "--",
+            sys.executable,
+            "-c",
+            "print('token sk-cli123')",
+        ])
+    finally:
+        os.chdir(old_cwd)
+
+    assert exit_code == 0
+    trace = next((tmp_path / ".agent-runs" / "latest").resolve().glob("trace.jsonl"))
+    raw_trace = trace.read_text(encoding="utf-8")
+    event = json.loads(raw_trace.splitlines()[-1])
+    assert event["output"]["stdout"].strip() == "token [REDACTED]"
+    assert "sk-cli123" not in raw_trace

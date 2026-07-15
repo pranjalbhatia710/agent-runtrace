@@ -21,7 +21,7 @@ def _resolve_run(path: str) -> Path:
 def cmd_run(args: argparse.Namespace) -> int:
     if not args.cmd:
         raise SystemExit("usage: agent-runtrace run -- <command>")
-    rec = Recorder(args.name)
+    rec = Recorder(args.name, redact_patterns=args.redact)
     result = rec.run(args.cmd, shell=False)
     run_dir = rec.finish()
     print(f"trace: {run_dir}")
@@ -76,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="record a shell command as a trace")
     run.add_argument("--name", default="shell-command")
     run.add_argument("--preserve-exit-code", action="store_true", help="return the wrapped command exit code")
+    run.add_argument("--redact", action="append", default=[], help="regex pattern to replace with [REDACTED] in recorded event payloads; repeat for multiple patterns")
     run.add_argument("cmd", nargs=argparse.REMAINDER)
     run.set_defaults(func=cmd_run)
     demo = sub.add_parser("demo", help="create a no-API-key demo trace")

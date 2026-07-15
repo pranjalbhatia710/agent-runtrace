@@ -52,7 +52,7 @@ print(rec.finish())
 ## CLI
 
 ```bash
-agent-runtrace run --name tests -- pytest -q
+agent-runtrace run --name tests --redact 'sk-[A-Za-z0-9]+' -- pytest -q
 agent-runtrace demo
 agent-runtrace view latest
 agent-runtrace inspect latest
