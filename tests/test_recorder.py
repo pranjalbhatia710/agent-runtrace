@@ -46,3 +46,15 @@ def test_shell_check_raises_and_records_error(tmp_path):
     run_dir = rec.finish()
     events = load_events(run_dir)
     assert events[0]["error"]
+
+
+def test_redact_patterns_apply_to_nested_event_payloads(tmp_path):
+    rec = Recorder("redaction", root=tmp_path / ".agent-runs", redact_patterns=[r"sk-[A-Za-z0-9]+"])
+    rec.log_llm("call", "token sk-secret123", "response sk-secret456", model="demo")
+    run_dir = rec.finish()
+
+    events = load_events(run_dir)
+    raw_trace = (run_dir / "trace.jsonl").read_text(encoding="utf-8")
+    assert events[0]["input"]["prompt"] == "token [REDACTED]"
+    assert events[0]["output"]["response"] == "response [REDACTED]"
+    assert "sk-secret" not in raw_trace

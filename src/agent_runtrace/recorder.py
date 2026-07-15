@@ -3,13 +3,14 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import json
+import re
 import secrets
 import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence
+from typing import Any, Dict, Iterator, List, Optional, Pattern, Sequence
 
 
 def _utc() -> str:
@@ -85,9 +86,10 @@ class Span:
 class Recorder:
     """Record agent runs as JSONL traces with optional command and git-diff capture."""
 
-    def __init__(self, name: str = "agent-run", root: str | Path = ".agent-runs"):
+    def __init__(self, name: str = "agent-run", root: str | Path = ".agent-runs", redact_patterns: Optional[Sequence[str]] = None):
         self.name = name
         self.root = Path(root)
+        self._redact_patterns: List[Pattern[str]] = [re.compile(pattern) for pattern in redact_patterns or []]
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self.run_dir = self.root / f"{timestamp}-{_slug(name)}"
         self.run_dir.mkdir(parents=True, exist_ok=True)
@@ -126,7 +128,23 @@ class Recorder:
 
     def _write_event(self, event: TraceEvent) -> None:
         with self.trace_path.open("a", encoding="utf-8") as f:
-            f.write(event.to_json() + "\n")
+            f.write(self._event_to_json(event) + "\n")
+
+    def _redact_value(self, value: Any) -> Any:
+        if isinstance(value, str):
+            redacted = value
+            for pattern in self._redact_patterns:
+                redacted = pattern.sub("[REDACTED]", redacted)
+            return redacted
+        if isinstance(value, list):
+            return [self._redact_value(item) for item in value]
+        if isinstance(value, dict):
+            return {key: self._redact_value(item) for key, item in value.items()}
+        return value
+
+    def _event_to_json(self, event: TraceEvent) -> str:
+        payload = self._redact_value(dataclasses.asdict(event))
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
     def _write_metadata(self) -> None:
         self.metadata_path.write_text(json.dumps(self.metadata, indent=2, sort_keys=True), encoding="utf-8")

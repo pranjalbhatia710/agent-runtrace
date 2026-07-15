@@ -42,7 +42,7 @@ agent-runtrace view latest --open
 ```python
 from agent_runtrace import Recorder
 
-rec = Recorder("fix failing test")
+rec = Recorder("fix failing test", redact_patterns=[r"sk-[A-Za-z0-9]+"])
 rec.log_llm("plan", "The tests are failing. What should we do?", "Run the focused test, inspect the failure, patch the smallest path.", model="demo-model")
 result = rec.run(["pytest", "-q"])
 rec.log_llm("summary", "What happened?", f"pytest exited with {result.returncode}")
@@ -99,7 +99,7 @@ Agent teams need repeatable debugging before they need another framework. Raw lo
 - [ ] LangChain / LangGraph integration
 - [ ] MCP proxy mode
 - [ ] Pytest snapshot assertions for traces
-- [ ] Secret redaction rules
+- [ ] Secret redaction rules (SDK-supported with `Recorder(..., redact_patterns=[...])`; CLI presets still planned)
 - [ ] Cost and token accounting
 - [ ] Browser action capture
 - [ ] GitHub Action that uploads trace artifacts on failure
