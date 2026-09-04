@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 from agent_runtrace import Recorder
 from agent_runtrace.cli import main
@@ -104,3 +105,20 @@ def test_run_cli_redact_flag_scrubs_shell_output(tmp_path):
     event = json.loads(raw_trace.splitlines()[-1])
     assert event["output"]["stdout"].strip() == "token [REDACTED]"
     assert "sk-cli123" not in raw_trace
+
+
+def test_inspect_cli_reports_failure_names_and_duration(tmp_path):
+    rec = Recorder("inspect summary", root=tmp_path / ".agent-runs")
+    rec.log("note", "planned", output={"ok": True})
+    rec.run([sys.executable, "-c", "raise SystemExit(4)"])
+    run_dir = rec.finish()
+
+    with patch("sys.argv", ["agent-runtrace"]), patch("builtins.print") as printed:
+        exit_code = main(["inspect", str(run_dir)])
+
+    assert exit_code == 0
+    payload = json.loads(printed.call_args.args[0])
+    assert payload["events"] == 2
+    assert payload["failures"] == 1
+    assert payload["failed_events"] == ["shell"]
+    assert payload["total_duration_ms"] >= 0

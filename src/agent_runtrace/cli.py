@@ -55,7 +55,20 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     run_dir = _resolve_run(args.run)
     events = load_events(run_dir)
     failures = [e for e in events if e.get("error") or (isinstance(e.get("output"), dict) and e["output"].get("exit_code") not in (None, 0))]
-    print(json.dumps({"run": str(run_dir), "events": len(events), "failures": len(failures), "types": sorted({e['type'] for e in events})}, indent=2))
+    total_duration_ms = sum(e.get("duration_ms") or 0 for e in events)
+    print(
+        json.dumps(
+            {
+                "run": str(run_dir),
+                "events": len(events),
+                "failures": len(failures),
+                "failed_events": [e.get("name") for e in failures],
+                "total_duration_ms": total_duration_ms,
+                "types": sorted({e["type"] for e in events}),
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
