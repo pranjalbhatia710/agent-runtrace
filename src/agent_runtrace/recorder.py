@@ -179,7 +179,7 @@ class Recorder:
             tags=["llm"],
         )
 
-    def run(self, cmd: Sequence[str] | str, cwd: str | Path | None = None, check: bool = False, timeout: Optional[int] = None, shell: bool = False) -> subprocess.CompletedProcess[str]:
+    def run(self, cmd: Sequence[str] | str, cwd: str | Path | None = None, check: bool = False, timeout: float | None = None, shell: bool = False) -> subprocess.CompletedProcess[str]:
         display = cmd if isinstance(cmd, str) else " ".join(cmd)
         with self.span("tool", "shell", input={"cmd": display, "cwd": str(cwd or Path.cwd()), "shell": shell}, tags=["shell"]) as span:
             try:
@@ -188,6 +188,17 @@ class Recorder:
                 if check and result.returncode != 0:
                     raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
                 return result
+            except subprocess.TimeoutExpired as exc:
+                span.set_output(
+                    {
+                        "stdout": exc.stdout or "",
+                        "stderr": exc.stderr or "",
+                        "timeout": timeout,
+                        "timed_out": True,
+                    }
+                )
+                span.set_error(exc)
+                raise
             except Exception as exc:
                 span.set_error(exc)
                 raise

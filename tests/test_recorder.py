@@ -53,6 +53,23 @@ def test_shell_check_raises_and_records_error(tmp_path):
     assert events[0]["error"]
 
 
+def test_shell_timeout_records_structured_timeout_output(tmp_path):
+    rec = Recorder("timeout failure", root=tmp_path / ".agent-runs")
+    try:
+        rec.run([sys.executable, "-c", "import time; time.sleep(1)"], timeout=0.01)
+    except subprocess.TimeoutExpired:
+        pass
+    else:
+        raise AssertionError("expected TimeoutExpired")
+
+    run_dir = rec.finish()
+    events = load_events(run_dir)
+
+    assert events[0]["error"]
+    assert events[0]["output"]["timed_out"] is True
+    assert events[0]["output"]["timeout"] == 0.01
+
+
 def test_redact_patterns_apply_to_nested_event_payloads(tmp_path):
     rec = Recorder("redaction", root=tmp_path / ".agent-runs", redact_patterns=[r"sk-[A-Za-z0-9]+"])
     rec.log_llm("call", "token sk-secret123", "response sk-secret456", model="demo")
