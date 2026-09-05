@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -39,6 +40,17 @@ def test_shell_failure_is_recorded_without_raising_by_default(tmp_path):
     events = load_events(run_dir)
     assert result.returncode == 7
     assert events[0]["output"]["exit_code"] == 7
+
+
+def test_shell_command_input_keeps_argv_and_quoted_display(tmp_path):
+    rec = Recorder("argv trace", root=tmp_path / ".agent-runs")
+    rec.run([sys.executable, "-c", "print('two words')"])
+    run_dir = rec.finish()
+
+    event = load_events(run_dir)[0]
+
+    assert event["input"]["argv"] == [sys.executable, "-c", "print('two words')"]
+    assert event["input"]["cmd"] == shlex.join([sys.executable, "-c", "print('two words')"])
 
 
 def test_shell_check_raises_and_records_error(tmp_path):

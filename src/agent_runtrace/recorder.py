@@ -5,6 +5,7 @@ import dataclasses
 import json
 import re
 import secrets
+import shlex
 import shutil
 import subprocess
 import time
@@ -180,8 +181,11 @@ class Recorder:
         )
 
     def run(self, cmd: Sequence[str] | str, cwd: str | Path | None = None, check: bool = False, timeout: float | None = None, shell: bool = False) -> subprocess.CompletedProcess[str]:
-        display = cmd if isinstance(cmd, str) else " ".join(cmd)
-        with self.span("tool", "shell", input={"cmd": display, "cwd": str(cwd or Path.cwd()), "shell": shell}, tags=["shell"]) as span:
+        display = cmd if isinstance(cmd, str) else shlex.join(str(part) for part in cmd)
+        input_payload = {"cmd": display, "cwd": str(cwd or Path.cwd()), "shell": shell}
+        if not isinstance(cmd, str):
+            input_payload["argv"] = [str(part) for part in cmd]
+        with self.span("tool", "shell", input=input_payload, tags=["shell"]) as span:
             try:
                 result = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, timeout=timeout, shell=shell, check=False)
                 span.set_output({"stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode})
