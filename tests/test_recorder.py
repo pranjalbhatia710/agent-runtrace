@@ -134,3 +134,14 @@ def test_inspect_cli_reports_failure_names_and_duration(tmp_path):
     assert payload["failures"] == 1
     assert payload["failed_events"] == ["shell"]
     assert payload["total_duration_ms"] >= 0
+
+
+def test_inspect_cli_can_fail_when_trace_contains_failures(tmp_path):
+    rec = Recorder("inspect failure gate", root=tmp_path / ".agent-runs")
+    rec.run([sys.executable, "-c", "raise SystemExit(9)"])
+    run_dir = rec.finish()
+
+    with patch("builtins.print"):
+        exit_code = main(["inspect", str(run_dir), "--fail-on-failure"])
+
+    assert exit_code == 1

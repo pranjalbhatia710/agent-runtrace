@@ -69,7 +69,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
             indent=2,
         )
     )
-    return 0
+    return 1 if args.fail_on_failure and failures else 0
 
 
 def cmd_export(args: argparse.Namespace) -> int:
@@ -100,6 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     view.set_defaults(func=cmd_view)
     inspect = sub.add_parser("inspect", help="print a JSON summary of a run")
     inspect.add_argument("run", nargs="?", default="latest")
+    inspect.add_argument("--fail-on-failure", action="store_true", help="exit 1 when the inspected trace contains failed events")
     inspect.set_defaults(func=cmd_inspect)
     export = sub.add_parser("export", help="export a run as a .agenttrace.zip bundle")
     export.add_argument("run", nargs="?", default="latest")

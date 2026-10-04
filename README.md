@@ -56,6 +56,7 @@ agent-runtrace run --name tests --redact 'sk-[A-Za-z0-9]+' -- pytest -q
 agent-runtrace demo
 agent-runtrace view latest
 agent-runtrace inspect latest
+agent-runtrace inspect latest --fail-on-failure
 agent-runtrace export latest --out failing-run.agenttrace.zip
 ```
 
