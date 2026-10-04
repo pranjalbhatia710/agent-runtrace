@@ -74,6 +74,8 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 def cmd_export(args: argparse.Namespace) -> int:
     run_dir = _resolve_run(args.run)
+    if args.with_viewer:
+        write_viewer(run_dir)
     out = Path(args.out or f"{run_dir.name}.agenttrace.zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in run_dir.rglob("*"):
@@ -105,6 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
     export = sub.add_parser("export", help="export a run as a .agenttrace.zip bundle")
     export.add_argument("run", nargs="?", default="latest")
     export.add_argument("--out")
+    export.add_argument("--with-viewer", action="store_true", help="generate and include the standalone HTML viewer before zipping")
     export.set_defaults(func=cmd_export)
     return parser
 

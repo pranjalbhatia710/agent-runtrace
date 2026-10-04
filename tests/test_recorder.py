@@ -3,6 +3,7 @@ import os
 import shlex
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -145,3 +146,18 @@ def test_inspect_cli_can_fail_when_trace_contains_failures(tmp_path):
         exit_code = main(["inspect", str(run_dir), "--fail-on-failure"])
 
     assert exit_code == 1
+
+
+def test_export_cli_can_include_standalone_viewer(tmp_path):
+    rec = Recorder("export viewer", root=tmp_path / ".agent-runs")
+    rec.log("note", "ship trace", output={"ok": True})
+    run_dir = rec.finish()
+    out = tmp_path / "trace.agenttrace.zip"
+
+    exit_code = main(["export", str(run_dir), "--with-viewer", "--out", str(out)])
+
+    assert exit_code == 0
+    with zipfile.ZipFile(out) as zf:
+        names = zf.namelist()
+    assert f"{run_dir.name}/index.html" in names
+    assert f"{run_dir.name}/trace.jsonl" in names
