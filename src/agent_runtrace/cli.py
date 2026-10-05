@@ -56,6 +56,8 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     events = load_events(run_dir)
     failures = [e for e in events if e.get("error") or (isinstance(e.get("output"), dict) and e["output"].get("exit_code") not in (None, 0))]
     total_duration_ms = sum(e.get("duration_ms") or 0 for e in events)
+    slowest = max(events, key=lambda e: e.get("duration_ms") or 0, default=None)
+    over_budget = args.max_total_duration_ms is not None and total_duration_ms > args.max_total_duration_ms
     print(
         json.dumps(
             {
@@ -64,12 +66,25 @@ def cmd_inspect(args: argparse.Namespace) -> int:
                 "failures": len(failures),
                 "failed_events": [e.get("name") for e in failures],
                 "total_duration_ms": total_duration_ms,
+                "max_total_duration_ms": args.max_total_duration_ms,
+                "over_duration_budget": over_budget,
+                "slowest_event": None
+                if slowest is None
+                else {
+                    "name": slowest.get("name"),
+                    "type": slowest.get("type"),
+                    "duration_ms": slowest.get("duration_ms") or 0,
+                },
                 "types": sorted({e["type"] for e in events}),
             },
             indent=2,
         )
     )
-    return 1 if args.fail_on_failure and failures else 0
+    if args.fail_on_failure and failures:
+        return 1
+    if over_budget:
+        return 1
+    return 0
 
 
 def cmd_export(args: argparse.Namespace) -> int:
@@ -103,6 +118,12 @@ def build_parser() -> argparse.ArgumentParser:
     inspect = sub.add_parser("inspect", help="print a JSON summary of a run")
     inspect.add_argument("run", nargs="?", default="latest")
     inspect.add_argument("--fail-on-failure", action="store_true", help="exit 1 when the inspected trace contains failed events")
+    inspect.add_argument(
+        "--max-total-duration-ms",
+        type=int,
+        default=None,
+        help="exit 1 when summed event duration exceeds this millisecond budget",
+    )
     inspect.set_defaults(func=cmd_inspect)
     export = sub.add_parser("export", help="export a run as a .agenttrace.zip bundle")
     export.add_argument("run", nargs="?", default="latest")
@@ -117,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if getattr(args, "cmd", None) and args.cmd[0] == "--":
         args.cmd = args.cmd[1:]
+    if getattr(args, "max_total_duration_ms", None) is not None and args.max_total_duration_ms < 0:
+        raise SystemExit("--max-total-duration-ms must be zero or greater")
     return args.func(args)
 
 

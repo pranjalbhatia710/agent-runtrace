@@ -57,6 +57,7 @@ agent-runtrace demo
 agent-runtrace view latest
 agent-runtrace inspect latest
 agent-runtrace inspect latest --fail-on-failure
+agent-runtrace inspect latest --max-total-duration-ms 30000
 agent-runtrace export latest --out failing-run.agenttrace.zip
 agent-runtrace export latest --with-viewer --out shareable-run.agenttrace.zip
 ```

@@ -135,6 +135,39 @@ def test_inspect_cli_reports_failure_names_and_duration(tmp_path):
     assert payload["failures"] == 1
     assert payload["failed_events"] == ["shell"]
     assert payload["total_duration_ms"] >= 0
+    assert payload["slowest_event"]["duration_ms"] >= 0
+    assert payload["over_duration_budget"] is False
+
+
+def test_inspect_cli_can_fail_when_trace_exceeds_duration_budget(tmp_path):
+    run_dir = tmp_path / "slow-run"
+    run_dir.mkdir()
+    (run_dir / "trace.jsonl").write_text(
+        json.dumps({"id": "evt_fast", "type": "llm", "name": "plan", "duration_ms": 15})
+        + "\n"
+        + json.dumps({"id": "evt_slow", "type": "tool", "name": "pytest", "duration_ms": 90})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with patch("builtins.print") as printed:
+        exit_code = main(["inspect", str(run_dir), "--max-total-duration-ms", "100"])
+
+    assert exit_code == 1
+    payload = json.loads(printed.call_args.args[0])
+    assert payload["total_duration_ms"] == 105
+    assert payload["max_total_duration_ms"] == 100
+    assert payload["over_duration_budget"] is True
+    assert payload["slowest_event"] == {"name": "pytest", "type": "tool", "duration_ms": 90}
+
+
+def test_inspect_cli_rejects_negative_duration_budget():
+    try:
+        main(["inspect", "latest", "--max-total-duration-ms", "-1"])
+    except SystemExit as exc:
+        assert str(exc) == "--max-total-duration-ms must be zero or greater"
+    else:
+        raise AssertionError("expected SystemExit")
 
 
 def test_inspect_cli_can_fail_when_trace_contains_failures(tmp_path):
