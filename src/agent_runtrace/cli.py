@@ -58,6 +58,8 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     total_duration_ms = sum(e.get("duration_ms") or 0 for e in events)
     slowest = max(events, key=lambda e: e.get("duration_ms") or 0, default=None)
     over_budget = args.max_total_duration_ms is not None and total_duration_ms > args.max_total_duration_ms
+    event_types = sorted({e["type"] for e in events})
+    missing_types = sorted(set(args.require_event_type or []) - set(event_types))
     print(
         json.dumps(
             {
@@ -68,6 +70,8 @@ def cmd_inspect(args: argparse.Namespace) -> int:
                 "total_duration_ms": total_duration_ms,
                 "max_total_duration_ms": args.max_total_duration_ms,
                 "over_duration_budget": over_budget,
+                "required_event_types": args.require_event_type or [],
+                "missing_event_types": missing_types,
                 "slowest_event": None
                 if slowest is None
                 else {
@@ -75,7 +79,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
                     "type": slowest.get("type"),
                     "duration_ms": slowest.get("duration_ms") or 0,
                 },
-                "types": sorted({e["type"] for e in events}),
+                "types": event_types,
             },
             indent=2,
         )
@@ -83,6 +87,8 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     if args.fail_on_failure and failures:
         return 1
     if over_budget:
+        return 1
+    if missing_types:
         return 1
     return 0
 
@@ -123,6 +129,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="exit 1 when summed event duration exceeds this millisecond budget",
+    )
+    inspect.add_argument(
+        "--require-event-type",
+        action="append",
+        default=[],
+        help="exit 1 unless the trace includes this event type; repeat for multiple required types",
     )
     inspect.set_defaults(func=cmd_inspect)
     export = sub.add_parser("export", help="export a run as a .agenttrace.zip bundle")

@@ -161,6 +161,30 @@ def test_inspect_cli_can_fail_when_trace_exceeds_duration_budget(tmp_path):
     assert payload["slowest_event"] == {"name": "pytest", "type": "tool", "duration_ms": 90}
 
 
+def test_inspect_cli_can_require_event_types(tmp_path):
+    run_dir = tmp_path / "event-type-run"
+    run_dir.mkdir()
+    (run_dir / "trace.jsonl").write_text(
+        json.dumps({"id": "evt_plan", "type": "llm", "name": "plan", "duration_ms": 1}) + "\n",
+        encoding="utf-8",
+    )
+
+    with patch("builtins.print") as printed:
+        exit_code = main([
+            "inspect",
+            str(run_dir),
+            "--require-event-type",
+            "llm",
+            "--require-event-type",
+            "tool",
+        ])
+
+    assert exit_code == 1
+    payload = json.loads(printed.call_args.args[0])
+    assert payload["required_event_types"] == ["llm", "tool"]
+    assert payload["missing_event_types"] == ["tool"]
+
+
 def test_inspect_cli_rejects_negative_duration_budget():
     try:
         main(["inspect", "latest", "--max-total-duration-ms", "-1"])
